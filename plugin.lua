@@ -1,21 +1,21 @@
+local events      = require("porla_events")
+local http_server = require("porla_http_server")
+local sessions    = require("porla_sessions")
+local timers      = require("porla_timers")
+
 return {
-    name    = "metrics",
-    version = "1.0",
-
     init = function()
-        print("Loading metrics plugin")
-
-        local all_metrics         = porla.session_metrics()
+        local all_metrics         = sessions.metrics()
         local per_session_metrics = {}
 
-        porla.on("session.stats", function(session, values)
+        events.on("session.stats", function(session, values)
             per_session_metrics[session.name] = {
                 values = values,
-                epoch  = porla.unix_time()
+                epoch  = timers.epoch()
             }
         end)
 
-        http_server.get("/metrics", function(req, res)
+        http_server.get("/metrics", function(_, res)
             for metric_key, metric in pairs(all_metrics) do
                 local normalized_key = metric_key:gsub("%.", "_")
 
@@ -36,9 +36,6 @@ return {
 
             res:finish()
         end)
-    end,
-
-    destroy = function()
-        print("Destroying metrics plugin")
     end
 }
+
