@@ -8,11 +8,15 @@ return {
         local all_metrics         = sessions.metrics()
         local per_session_metrics = {}
 
-        events.on("session.stats", function(session, values)
-            per_session_metrics[session.name] = {
-                values = values,
+        events.on("session.stats", function(e)
+            per_session_metrics[e.session.name] = {
+                values = e.stats,
                 epoch  = timers.epoch()
             }
+        end)
+
+        events.on("session.unloaded", function(e)
+            per_session_metrics[e.session_name] = nil
         end)
 
         http_server.get("/metrics", function(_, res)
@@ -29,7 +33,9 @@ return {
                     local value = data.values[metric_key]
 
                     if value ~= nil then
-                        res:write("libtorrent_" .. normalized_key .. "{session=\"" .. session_name .. "\"} " .. value .. " " .. data.epoch .. "\n")
+                        res:write("libtorrent_" ..
+                            normalized_key ..
+                            "{session=\"" .. session_name .. "\"} " .. value .. " " .. data.epoch .. "\n")
                     end
                 end
             end
@@ -38,4 +44,3 @@ return {
         end)
     end
 }
-
