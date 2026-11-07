@@ -1,7 +1,6 @@
 local events      = require("porla_events")
 local http_server = require("porla_http_server")
 local sessions    = require("porla_sessions")
-local timers      = require("porla_timers")
 
 return {
     init = function()
@@ -9,10 +8,7 @@ return {
         local per_session_metrics = {}
 
         events.on("session.stats", function(e)
-            per_session_metrics[e.session.name] = {
-                values = e.stats,
-                epoch  = timers.epoch()
-            }
+            per_session_metrics[e.session.name] = e.stats
         end)
 
         events.on("session.unloaded", function(e)
@@ -20,6 +16,8 @@ return {
         end)
 
         http_server.get("/metrics", function(_, res)
+            res:write_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+
             for metric_key, metric in pairs(all_metrics) do
                 local normalized_key = metric_key:gsub("%.", "_")
 
@@ -29,13 +27,15 @@ return {
 
                 res:write("# TYPE libtorrent_" .. normalized_key .. " " .. metric.type .. "\n")
 
-                for session_name, data in pairs(per_session_metrics) do
-                    local value = data.values[metric_key]
+                for session_name, stats in pairs(per_session_metrics) do
+                    local value = stats[metric_key]
 
                     if value ~= nil then
+                        -- no explicit timestamps since prometheus discards repeated timestamps
+                        -- and a late session.stats event would then be a gap in the series
                         res:write("libtorrent_" ..
                             normalized_key ..
-                            "{session=\"" .. session_name .. "\"} " .. value .. " " .. data.epoch .. "\n")
+                            "{session=\"" .. session_name .. "\"} " .. value .. "\n")
                     end
                 end
             end
